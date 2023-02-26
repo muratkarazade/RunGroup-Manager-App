@@ -9,13 +9,13 @@ namespace RunGroupWebApp.Controllers
 {
     public class RaceController : Controller
     {
-        
+
         private readonly IRaceRepository _raceRepository;
         private readonly IPhotoService _photoService;
 
-        public RaceController(IRaceRepository raceRepository,IPhotoService photoService )
+        public RaceController(IRaceRepository raceRepository, IPhotoService photoService)
         {
-            
+
             _raceRepository = raceRepository;
             _photoService = photoService;
         }
@@ -62,6 +62,61 @@ namespace RunGroupWebApp.Controllers
                 ModelState.AddModelError("", "Photo upload failed!");
             }
             return View(RaceVM);
+        }
+        [HttpGet]
+        public async Task<IActionResult> Edit(int id)
+        {
+            var race = await _raceRepository.GetByIdAsync(id);
+            if(race == null) { return View("Error"); }
+            var raceVM = new EditRaceViewModel
+            {
+                Id = id,
+                Title = race.Title,
+                Description = race.Description,
+                URL = race.Image,
+                Address = race.Address,
+                AddressId = race.AddressId,
+                RaceCategory = race.RaceCategory
+            };
+            return View(raceVM);
+        }
+        [HttpPost]
+        public async Task<IActionResult> Edit(int id, EditClubViewModel raceVM)
+        {
+            if (!ModelState.IsValid)
+            {
+                ModelState.AddModelError("22623", "Failed to edit");
+                return View("Edit",raceVM);
+            }
+            var userRace = await _raceRepository.GetByIdAsyncNoTracking(id);
+            if(userRace != null)
+            {
+                try
+                {
+                    await _photoService.DeletePhotoAsync(userRace.Image);
+                }
+                catch (Exception ex)
+                {
+                    ModelState.AddModelError("", "Could not delete photo");
+                    return View(raceVM);
+                }
+                var photoResult = await _photoService.AddPhotoAsync(raceVM.Image);
+                var race = new Race
+                {
+                    Id = id,
+                    Title = raceVM.Title,
+                    Description = raceVM.Description,
+                    Image = photoResult.Url.ToString(),
+                    Address = raceVM.Address,
+                    AddressId = raceVM.AddressId
+                };
+                _raceRepository.Update(race);
+                return RedirectToAction("Index");
+            }
+            else
+            {
+                return View(raceVM);
+            }
         }
     }
 }
